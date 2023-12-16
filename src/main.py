@@ -4,7 +4,6 @@ from collections import defaultdict
 from urllib.parse import urljoin
 
 import requests_cache
-from bs4 import BeautifulSoup
 from tqdm import tqdm
 
 from configs import configure_argument_parser, configure_logging
@@ -12,17 +11,17 @@ from constants import BASE_DIR, MAIN_DOC_URL, PEP_URL, EXPECTED_STATUS, DOWNLOAD
 from outputs import control_output
 from utils import find_tag, get_soup
 
-DOWNLOAD_MSG = 'Архив был загружен и сохранён: {archive_path}'
-START_MSG = 'Парсер запущен!'
-NOT_FIND_MSG = 'Ничего не нашлось'
-ERR_MSG = 'Ошибка во время выполнения: {err}'
-ARGS_MSG = 'Аргументы командной строки: {args}'
-END_MSG = 'Парсер завершил работу.'
-STATUS_ERR_MSG = ('Несовпадающие статусы:\n'
-                  '{url}\n'
-                  'Статус в карточке: {status_pep_page}\n'
-                  'Ожидаемые статусы: '
-                  '{expected_status}')
+DOWNLOAD_MESSAGE = 'Архив был загружен и сохранён: {archive_path}'
+START_MESSAGE = 'Парсер запущен!'
+NOT_FIND_MESSAGE = 'Ничего не нашлось'
+ERROR_MESSAGE = 'Ошибка во время выполнения: {err}'
+ARGS_MESSAGE = 'Аргументы командной строки: {args}'
+END_MESSAGE = 'Парсер завершил работу.'
+STATUS_ERROR_MESSAGE = ('Несовпадающие статусы:\n'
+                        '{url}\n'
+                        'Статус в карточке: {status_pep_page}\n'
+                        'Ожидаемые статусы: '
+                        '{expected_status}')
 DOC_HREF = 'Ссылка на документацию'
 PAGE_HREF = 'Ссылка на статью'
 VERSION = 'Версия'
@@ -65,7 +64,7 @@ def latest_versions(session):
             a_tags = ul.find_all('a')
             break
     else:
-        raise ValueError(NOT_FIND_MSG)
+        raise ValueError(NOT_FIND_MESSAGE)
     results = [(DOC_HREF, VERSION, STATUS)]
     pattern = r'Python (?P<version>\d\.\d+) \((?P<status>.*)\)'
     for a_tag in a_tags:
@@ -94,7 +93,7 @@ def download(session):
     response = session.get(archive_url)
     with open(archive_path, 'wb') as file:
         file.write(response.content)
-    logging.info(DOWNLOAD_MSG.format(archive_path=archive_path))
+    logging.info(DOWNLOAD_MESSAGE.format(archive_path=archive_path))
 
 
 def pep(session):
@@ -119,7 +118,7 @@ def pep(session):
             string='Status').parent.find_next_sibling('dd').string
         status_sum[status_pep_page] += 1
         if status_pep_page not in EXPECTED_STATUS[status]:
-            warning_messages.append(STATUS_ERR_MSG.format(
+            warning_messages.append(STATUS_ERROR_MESSAGE.format(
                 url=url,
                 status_pep_page=status_pep_page,
                 expected_status=EXPECTED_STATUS[status])
@@ -142,10 +141,10 @@ MODE_TO_FUNCTION = {
 
 def main():
     configure_logging()
-    logging.info(START_MSG)
+    logging.info(START_MESSAGE)
     arg_parser = configure_argument_parser(MODE_TO_FUNCTION.keys())
     args = arg_parser.parse_args()
-    logging.info(ARGS_MSG.format(args=args))
+    logging.info(ARGS_MESSAGE.format(args=args))
     session = requests_cache.CachedSession()
     if args.clear_cache:
         session.cache.clear()
@@ -156,8 +155,8 @@ def main():
         if results is not None:
             control_output(results, args)
     except Exception as e:
-        logging.error(ERR_MSG.format(err=e))
-    logging.info(END_MSG)
+        logging.error(ERROR_MESSAGE.format(err=e))
+    logging.info(END_MESSAGE)
 
 
 if __name__ == '__main__':
