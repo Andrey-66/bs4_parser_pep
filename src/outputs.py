@@ -3,6 +3,7 @@ import datetime as dt
 import logging
 
 from prettytable import PrettyTable
+
 from constants import BASE_DIR, DATETIME_FORMAT, RESULTS_DIR
 
 SAVE_FILE_MESSAGE = 'Файл с результатами был сохранён: {file_path}'
@@ -50,4 +51,3 @@ def control_output(results, cli_args):
         OUTPUT_FUNCIONS[output](results=results, cli_args=cli_args)
     else:
         default_output(results)
-

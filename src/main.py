@@ -7,7 +7,8 @@ import requests_cache
 from tqdm import tqdm
 
 from configs import configure_argument_parser, configure_logging
-from constants import BASE_DIR, MAIN_DOC_URL, PEP_URL, EXPECTED_STATUS, DOWNLOADS_DIR
+from constants import (BASE_DIR, DOWNLOADS_DIR, EXPECTED_STATUS, MAIN_DOC_URL,
+                       PEP_URL)
 from outputs import control_output
 from utils import find_tag, get_soup
 
@@ -35,7 +36,9 @@ TOTAL = 'Итог'
 def whats_new(session):
     whats_new_url = urljoin(MAIN_DOC_URL, 'whatsnew/')
     soup = get_soup(session, whats_new_url)
-    sections_by_python = soup.select('#what-s-new-in-python div.toctree-wrapper li.toctree-l1')
+    sections_by_python = soup.select('#what-s-new-in-python '
+                                     'div.toctree-wrapper '
+                                     'li.toctree-l1')
 
     results = [(PAGE_HREF, TITLE, AUTHOR)]
     for section in tqdm(sections_by_python):
@@ -83,7 +86,9 @@ def download(session):
     download_dir = BASE_DIR / DOWNLOADS_DIR
     downloads_url = urljoin(MAIN_DOC_URL, 'download.html')
     soup = get_soup(session, downloads_url)
-    pdf_a4_link = soup.select_one('div[role="main"] table.docutils a[href$="pdf-a4.zip"]')['href']
+    pdf_a4_link = soup.select_one('div[role="main"] '
+                                  'table.docutils '
+                                  'a[href$="pdf-a4.zip"]')['href']
     archive_url = urljoin(downloads_url, pdf_a4_link)
     filename = archive_url.split('/')[-1]
 
@@ -102,7 +107,6 @@ def pep(session):
     tbody_tag = find_tag(section_tag, 'tbody')
     tr_tags = tbody_tag.find_all('tr')
     status_sum = defaultdict(int)
-    results = [(STATUS, COUNT)]
     warning_messages = []
     for tag in tqdm(tr_tags):
         status_list = list(find_tag(tag, 'abbr').text)
@@ -125,9 +129,9 @@ def pep(session):
             )
     logging.warning('\n'.join(warning_messages))
     return [
-        ('Статус', 'Количество'),
-        *results.items(),
-        ('Всего', sum(results.values())),
+        (STATUS, COUNT),
+        *status_sum.items(),
+        (TOTAL, sum(status_sum.values())),
     ]
 
 

@@ -30,5 +30,7 @@ def get_soup(session, url):
 def find_tag(soup, tag, attrs=None):
     searched_tag = soup.find(tag, attrs=(attrs or {}))
     if searched_tag is None:
-        raise ParserFindTagException(TAG_NOT_FIND_ERROR.format(tag=tag, attrs=attrs))
+        raise ParserFindTagException(
+            TAG_NOT_FIND_ERROR.format(tag=tag, attrs=attrs)
+        )
     return searched_tag
