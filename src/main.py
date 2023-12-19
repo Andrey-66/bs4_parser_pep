@@ -4,18 +4,19 @@ from collections import defaultdict
 from urllib.parse import urljoin
 
 import requests_cache
+from requests import RequestException
 from tqdm import tqdm
 
 from configs import configure_argument_parser, configure_logging
 from constants import (BASE_DIR, DOWNLOADS_DIR, EXPECTED_STATUS, MAIN_DOC_URL,
-                       PEP_URL)
+                       PEP_URL, REQUEST_ERROR_MESSAGE)
 from outputs import control_output
 from utils import find_tag, get_soup
 
 DOWNLOAD_MESSAGE = 'Архив был загружен и сохранён: {archive_path}'
 START_MESSAGE = 'Парсер запущен!'
 NOT_FIND_MESSAGE = 'Ничего не нашлось'
-ERROR_MESSAGE = 'Ошибка во время выполнения: {err}'
+ERROR_MESSAGE = 'Ошибка во время выполнения: {error}'
 ARGS_MESSAGE = 'Аргументы командной строки: {args}'
 END_MESSAGE = 'Парсер завершил работу.'
 STATUS_ERROR_MESSAGE = ('Несовпадающие статусы:\n'
@@ -23,14 +24,6 @@ STATUS_ERROR_MESSAGE = ('Несовпадающие статусы:\n'
                         'Статус в карточке: {status_pep_page}\n'
                         'Ожидаемые статусы: '
                         '{expected_status}')
-DOC_HREF = 'Ссылка на документацию'
-PAGE_HREF = 'Ссылка на статью'
-VERSION = 'Версия'
-STATUS = 'Статус'
-TITLE = 'Заголовок'
-AUTHOR = 'Редактор, Автор'
-COUNT = 'Количество'
-TOTAL = 'Итог'
 
 
 def whats_new(session):
@@ -38,23 +31,24 @@ def whats_new(session):
     soup = get_soup(session, whats_new_url)
     sections_by_python = soup.select('#what-s-new-in-python '
                                      'div.toctree-wrapper '
-                                     'li.toctree-l1')
+                                     'li.toctree-l1 a')
 
-    results = [(PAGE_HREF, TITLE, AUTHOR)]
+    results = [('Ссылка на статью', 'Заголовок', 'Редактор, Автор')]
     for section in tqdm(sections_by_python):
-        version_a_tag = section.find('a')
-        href = version_a_tag['href']
+        href = section['href']
         version_link = urljoin(whats_new_url, href)
-        soup = get_soup(session, version_link)
-        if soup is None:
-            continue
-        results.append(
-            (
-                version_link,
-                find_tag(soup, 'h1').text,
-                find_tag(soup, 'dl').text.replace('\n', ' ')
+        try:
+            soup = get_soup(session, version_link)
+            results.append(
+                (
+                    version_link,
+                    find_tag(soup, 'h1').text,
+                    find_tag(soup, 'dl').text.replace('\n', ' ')
+                )
             )
-        )
+        except RequestException as e:
+            logging.error(REQUEST_ERROR_MESSAGE.format(link=version_link, error=e))
+
     return results
 
 
@@ -67,8 +61,8 @@ def latest_versions(session):
             a_tags = ul.find_all('a')
             break
     else:
-        raise ValueError(NOT_FIND_MESSAGE)
-    results = [(DOC_HREF, VERSION, STATUS)]
+        raise RuntimeError(NOT_FIND_MESSAGE)
+    results = [('Ссылка на документацию', 'Версия', 'Статус')]
     pattern = r'Python (?P<version>\d\.\d+) \((?P<status>.*)\)'
     for a_tag in a_tags:
         text_match = re.search(pattern, a_tag.text)
@@ -115,23 +109,26 @@ def pep(session):
             status = status_list[1:][0]
         url = urljoin(PEP_URL, find_tag(tag, 'a', attrs={
             'class': 'pep reference internal'})['href'])
-        element_soup = get_soup(session, url)
-        table = find_tag(element_soup, 'dl',
-                         attrs={'class': 'rfc2822 field-list simple'})
-        status_pep_page = table.find(
-            string='Status').parent.find_next_sibling('dd').string
-        status_sum[status_pep_page] += 1
-        if status_pep_page not in EXPECTED_STATUS[status]:
-            warning_messages.append(STATUS_ERROR_MESSAGE.format(
-                url=url,
-                status_pep_page=status_pep_page,
-                expected_status=EXPECTED_STATUS[status])
-            )
-    logging.warning('\n'.join(warning_messages))
+        try:
+            element_soup = get_soup(session, url)
+            table = find_tag(element_soup, 'dl',
+                             attrs={'class': 'rfc2822 field-list simple'})
+            status_pep_page = table.find(
+                string='Status').parent.find_next_sibling('dd').string
+            status_sum[status_pep_page] += 1
+            if status_pep_page not in EXPECTED_STATUS[status]:
+                warning_messages.append(STATUS_ERROR_MESSAGE.format(
+                    url=url,
+                    status_pep_page=status_pep_page,
+                    expected_status=EXPECTED_STATUS[status])
+                )
+        except RequestException as e:
+            logging.error(REQUEST_ERROR_MESSAGE.format(link=url, error=e))
+        logging.warning('\n'.join(warning_messages))
     return [
-        (STATUS, COUNT),
+        ('Статус', 'Количество'),
         *status_sum.items(),
-        (TOTAL, sum(status_sum.values())),
+        ('Итог', sum(status_sum.values())),
     ]
 
 
@@ -149,17 +146,16 @@ def main():
     arg_parser = configure_argument_parser(MODE_TO_FUNCTION.keys())
     args = arg_parser.parse_args()
     logging.info(ARGS_MESSAGE.format(args=args))
-    session = requests_cache.CachedSession()
-    if args.clear_cache:
-        session.cache.clear()
-
-    parser_mode = args.mode
     try:
+        session = requests_cache.CachedSession()
+        if args.clear_cache:
+            session.cache.clear()
+        parser_mode = args.mode
         results = MODE_TO_FUNCTION[parser_mode](session)
         if results is not None:
             control_output(results, args)
     except Exception as e:
-        logging.error(ERROR_MESSAGE.format(err=e))
+        logging.error(ERROR_MESSAGE.format(error=e))
     logging.info(END_MESSAGE)
 
 

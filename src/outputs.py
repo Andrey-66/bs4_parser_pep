@@ -4,15 +4,12 @@ import logging
 
 from prettytable import PrettyTable
 
-from constants import BASE_DIR, DATETIME_FORMAT, RESULTS_DIR
+from constants import BASE_DIR, DATETIME_FORMAT, RESULTS_DIR, PARSER_OUTPUT_PRETTY, PARSER_OUTPUT_FILE
 
 SAVE_FILE_MESSAGE = 'Файл с результатами был сохранён: {file_path}'
-PRETTY_OUTPUT = 'pretty'
-FILE_OUTPUT = 'file'
-FILE_ENCODING = 'utf-8'
 
 
-def default_output(results):
+def default_output(results, **kwargs):
     for row in results:
         print(*row)
 
@@ -25,29 +22,25 @@ def pretty_output(results, **kwargs):
     print(table)
 
 
-def file_output(results, cli_args, **kwargs):
+def file_output(results, cli_args, encoding='utf-8', **kwargs):
     directory = BASE_DIR / RESULTS_DIR
     directory.mkdir(exist_ok=True)
     parser_mode = cli_args.mode
-    now = dt.datetime.now()
-    now_formatted = now.strftime(DATETIME_FORMAT)
+    now_formatted = dt.datetime.now().strftime(DATETIME_FORMAT)
     file_name = f'{parser_mode}_{now_formatted}.csv'
     file_path = directory / file_name
-    with open(file_path, 'w', encoding=FILE_ENCODING) as f:
-        writer = csv.writer(f, dialect=csv.unix_dialect)
-        writer.writerows(results)
+    with open(file_path, 'w', encoding=encoding) as f:
+        csv.writer(f, dialect=csv.unix_dialect).writerows(results)
     logging.info(SAVE_FILE_MESSAGE.format(file_path=file_path))
 
 
 OUTPUT_FUNCIONS = {
-    PRETTY_OUTPUT: pretty_output,
-    FILE_OUTPUT: file_output,
+    PARSER_OUTPUT_PRETTY: pretty_output,
+    PARSER_OUTPUT_FILE: file_output,
+    None: default_output
 }
 
 
 def control_output(results, cli_args):
     output = cli_args.output
-    if output in OUTPUT_FUNCIONS:
-        OUTPUT_FUNCIONS[output](results=results, cli_args=cli_args)
-    else:
-        default_output(results)
+    OUTPUT_FUNCIONS[output](results=results, cli_args=cli_args)

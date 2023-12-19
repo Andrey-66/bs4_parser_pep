@@ -14,6 +14,8 @@ DATETIME_FORMAT = '%Y-%m-%d_%H-%M-%S'
 PARSER_OUTPUT_PRETTY = 'pretty'
 PARSER_OUTPUT_FILE = 'file'
 
+REQUEST_ERROR_MESSAGE = "Произошла ошибка при запросе страницы {link}: {error}"
+
 EXPECTED_STATUS = {
     'A': ('Active', 'Accepted'),
     'D': ('Deferred',),

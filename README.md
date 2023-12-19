@@ -5,8 +5,8 @@ Python, BeautifulSoup4, Prettytable
 ## Команды развертывания
 - Клонировать репозиторий  
 `git clone https://github.com/Andrey-66/bs4_parser_pep.git`  
-`git clone git@github.com:Andrey-66/bs4_parser_pep.git`
 - Cоздать и активировать виртуальное окружение  
+`cd bs4_parser_pep`
 `python3 -m venv env && source env/bin/activate`
 - Установить зависимости
 `pip install -r requirements.txt`
@@ -19,3 +19,5 @@ Python, BeautifulSoup4, Prettytable
     `python main.py pep -o file`
     - Получить последние версии в виде консольной таблицы
     `python main.py latest-versions -o pretty`
+
+Автор: Andrey66
