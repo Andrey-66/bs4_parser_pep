@@ -47,7 +47,10 @@ def whats_new(session):
                 )
             )
         except RequestException as e:
-            logging.error(REQUEST_ERROR_MESSAGE.format(link=version_link, error=e))
+            logging.error(REQUEST_ERROR_MESSAGE.format(
+                link=version_link,
+                error=e)
+            )
 
     return results
 
