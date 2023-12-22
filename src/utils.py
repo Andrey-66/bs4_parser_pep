@@ -13,7 +13,7 @@ def get_response(session, url, encoding="utf-8"):
         response.encoding = encoding
         return response
     except RequestException as e:
-        raise RuntimeError(REQUEST_ERROR_MESSAGE.format(link=url, error=e))
+        raise ConnectionError(REQUEST_ERROR_MESSAGE.format(link=url, error=e))
 
 
 def get_soup(session, url, features='lxml'):

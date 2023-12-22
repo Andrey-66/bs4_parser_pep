@@ -4,7 +4,6 @@ from collections import defaultdict
 from urllib.parse import urljoin
 
 import requests_cache
-from requests import RequestException
 from tqdm import tqdm
 
 from configs import configure_argument_parser, configure_logging
@@ -28,15 +27,17 @@ STATUS_ERROR_MESSAGE = ('Несовпадающие статусы:\n'
 
 
 def whats_new(session):
-    sections_by_python = get_soup(session, urljoin(MAIN_DOC_URL, 'whatsnew/'))\
-        .select(
-            '#what-s-new-in-python '
-            'div.toctree-wrapper '
-            'li.toctree-l1 a[href$=".html"]'
-        )
-    error_messages = []
+    a_tags = get_soup(
+        session,
+        urljoin(MAIN_DOC_URL, 'whatsnew/')
+    ).select(
+        '#what-s-new-in-python '
+        'div.toctree-wrapper '
+        'li.toctree-l1 a[href$=".html"]'
+    )
+    errors = []
     results = [('Ссылка на статью', 'Заголовок', 'Редактор, Автор')]
-    for a_tag in tqdm(sections_by_python):
+    for a_tag in tqdm(a_tags):
         href = a_tag['href']
         version_link = urljoin(urljoin(MAIN_DOC_URL, 'whatsnew/'), href)
         try:
@@ -46,13 +47,13 @@ def whats_new(session):
                 find_tag(soup, 'h1').text,
                 find_tag(soup, 'dl').text.replace('\n', ' ')
             ))
-        except RequestException as e:
-            error_messages.append(REQUEST_ERROR_MESSAGE.format(
+        except ConnectionError as e:
+            errors.append(REQUEST_ERROR_MESSAGE.format(
                 link=version_link,
                 error=e)
             )
-    if error_messages:
-        logging.error_messages('\n'.join(error_messages))
+    if errors:
+        logging.error('\n'.join(errors))
 
     return results
 
@@ -110,8 +111,8 @@ def pep(session):
     tbody_tag = find_tag(section_tag, 'tbody')
     tr_tags = tbody_tag.find_all('tr')
     status_sum = defaultdict(int)
-    warning_messages = []
-    error_messages = []
+    warnings = []
+    errors = []
     for tag in tqdm(tr_tags):
         status_list = list(find_tag(tag, 'abbr').text)
         status = ''
@@ -127,19 +128,19 @@ def pep(session):
                 string='Status').parent.find_next_sibling('dd').string
             status_sum[status_pep_page] += 1
             if status_pep_page not in EXPECTED_STATUS[status]:
-                warning_messages.append(STATUS_ERROR_MESSAGE.format(
+                warnings.append(STATUS_ERROR_MESSAGE.format(
                     url=url,
                     status_pep_page=status_pep_page,
                     expected_status=EXPECTED_STATUS[status])
                 )
-        except RequestException as e:
-            error_messages.append(
+        except ConnectionError as e:
+            errors.append(
                 REQUEST_ERROR_MESSAGE.format(link=url, error=e)
             )
-    if warning_messages:
-        logging.warning('\n'.join(warning_messages))
-    if error_messages:
-        logging.error('\n'.join(error_messages))
+    if warnings:
+        logging.warning('\n'.join(warnings))
+    if errors:
+        logging.error('\n'.join(errors))
     return [
         ('Статус', 'Количество'),
         *status_sum.items(),
