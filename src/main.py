@@ -9,10 +9,11 @@ from tqdm import tqdm
 
 from configs import configure_argument_parser, configure_logging
 from constants import (BASE_DIR, DOWNLOADS_DIR, EXPECTED_STATUS, MAIN_DOC_URL,
-                       PEP_URL, REQUEST_ERROR_MESSAGE)
+                       PEP_URL)
 from outputs import control_output
 from utils import find_tag, get_soup
 
+REQUEST_ERROR_MESSAGE = "Произошла ошибка при запросе страницы {link}: {error}"
 DOWNLOAD_MESSAGE = 'Архив был загружен и сохранён: {archive_path}'
 START_MESSAGE = 'Парсер запущен!'
 NOT_FIND_MESSAGE = 'Ничего не нашлось'
@@ -27,30 +28,31 @@ STATUS_ERROR_MESSAGE = ('Несовпадающие статусы:\n'
 
 
 def whats_new(session):
-    whats_new_url = urljoin(MAIN_DOC_URL, 'whatsnew/')
-    soup = get_soup(session, whats_new_url)
-    sections_by_python = soup.select('#what-s-new-in-python '
-                                     'div.toctree-wrapper '
-                                     'li.toctree-l1 a[href$=".html"]')
-
+    sections_by_python = get_soup(session, urljoin(MAIN_DOC_URL, 'whatsnew/'))\
+        .select(
+            '#what-s-new-in-python '
+            'div.toctree-wrapper '
+            'li.toctree-l1 a[href$=".html"]'
+        )
+    error_messages = []
     results = [('Ссылка на статью', 'Заголовок', 'Редактор, Автор')]
-    for section in tqdm(sections_by_python):
-        href = section['href']
-        version_link = urljoin(whats_new_url, href)
+    for a_tag in tqdm(sections_by_python):
+        href = a_tag['href']
+        version_link = urljoin(urljoin(MAIN_DOC_URL, 'whatsnew/'), href)
         try:
             soup = get_soup(session, version_link)
-            results.append(
-                (
-                    version_link,
-                    find_tag(soup, 'h1').text,
-                    find_tag(soup, 'dl').text.replace('\n', ' ')
-                )
-            )
+            results.append((
+                version_link,
+                find_tag(soup, 'h1').text,
+                find_tag(soup, 'dl').text.replace('\n', ' ')
+            ))
         except RequestException as e:
-            logging.error(REQUEST_ERROR_MESSAGE.format(
+            error_messages.append(REQUEST_ERROR_MESSAGE.format(
                 link=version_link,
                 error=e)
             )
+    if error_messages:
+        logging.error_messages('\n'.join(error_messages))
 
     return results
 
@@ -82,10 +84,14 @@ def latest_versions(session):
 def download(session):
     download_dir = BASE_DIR / DOWNLOADS_DIR
     downloads_url = urljoin(MAIN_DOC_URL, 'download.html')
-    soup = get_soup(session, downloads_url)
-    pdf_a4_link = soup.select_one('div[role="main"] '
-                                  'table.docutils '
-                                  'a[href$="pdf-a4.zip"]')['href']
+    pdf_a4_link = get_soup(
+        session,
+        downloads_url
+    ).select_one(
+        'div[role="main"] '
+        'table.docutils '
+        'a[href$="pdf-a4.zip"]'
+    )['href']
     archive_url = urljoin(downloads_url, pdf_a4_link)
     filename = archive_url.split('/')[-1]
 
@@ -105,6 +111,7 @@ def pep(session):
     tr_tags = tbody_tag.find_all('tr')
     status_sum = defaultdict(int)
     warning_messages = []
+    error_messages = []
     for tag in tqdm(tr_tags):
         status_list = list(find_tag(tag, 'abbr').text)
         status = ''
@@ -126,8 +133,13 @@ def pep(session):
                     expected_status=EXPECTED_STATUS[status])
                 )
         except RequestException as e:
-            logging.error(REQUEST_ERROR_MESSAGE.format(link=url, error=e))
+            error_messages.append(
+                REQUEST_ERROR_MESSAGE.format(link=url, error=e)
+            )
+    if warning_messages:
         logging.warning('\n'.join(warning_messages))
+    if error_messages:
+        logging.error('\n'.join(error_messages))
     return [
         ('Статус', 'Количество'),
         *status_sum.items(),
