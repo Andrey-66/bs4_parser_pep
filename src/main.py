@@ -31,7 +31,7 @@ def whats_new(session):
     soup = get_soup(session, whats_new_url)
     sections_by_python = soup.select('#what-s-new-in-python '
                                      'div.toctree-wrapper '
-                                     'li.toctree-l1 a')
+                                     'li.toctree-l1 a[href$=".html"]')
 
     results = [('Ссылка на статью', 'Заголовок', 'Редактор, Автор')]
     for section in tqdm(sections_by_python):
